@@ -1,25 +1,106 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+author: "cdo03c"
+date: "Thursday, February 05, 2015"
+output: html_document
+keep_md: true
 ---
 
+```{r Sytem Parameters}
+sessionInfo()
+Sys.time()
+```
 
-## Loading and preprocessing the data
+###Loading and Processing the Data
+
+```{r Loading and Preprocessing the Data}
+if(!file.exists("./data")){dir.create("./data")}
+if(!file.exists("./data/activity.zip")){download.file(url = "https://github.com/cdo03c/RepData_PeerAssessment1/blob/master/activity.zip?raw=true", destfile = "./data/activity.zip", mode = "wb")}
+unzip(zipfile = "./data/activity.zip", exdir = "./data")
+WD <- getwd()
+setwd("./data")
+
+activity <- read.csv(file = "activity.csv", header = T, colClasses = c("integer", "Date", "integer"))
+```
+
+###Part 1: Total Number of Steps Taken Per Day
+
+Based on the recorded activity from the personal activity monitoring device, below is a histogram showing the frequencies of the total number of steps taken per day with the missing data removed.  The most number of days have total steps between 10,000 and 15,000.
+
+```{r Mean Total Number of Steps Per Day}
+library("plyr")
+
+dailytotal <- ddply(activity, .(date), summarize, total_steps = sum(steps, na.rm = TRUE))
+hist(dailytotal$total_steps, main = "Total Number of Steps Taken", xlab = "Total Steps Per Day")
+stepsmean <- round(mean(dailytotal$total_steps, na.rm = T))
+stepsmedian <- round(median(dailytotal$total_steps, na.rm = T))
+```
+
+The mean for the total number of steps taken in a day is `r stepsmean` and the median for the total number of steps taken in a day is `r stepsmedian`.
 
 
+###Part 2: Average Daily Activity Pattern
 
-## What is mean total number of steps taken per day?
+The recorded activity levels revealed the following daily activity pattern with the missing data removed:
+
+```{r Average Daily Activity Pattern}
+intervalavg <- ddply(activity, .(interval), summarize, avg_steps = mean(steps, na.rm = TRUE))
+plot(x = intervalavg$interval, y=intervalavg$avg_steps, type ="l", main = "Average Daily Activity Pattern", xlab = "Five Minute Daily Intervals", ylab = "Average Steps")
+maxint <- subset(intervalavg, intervalavg$avg_steps == max(intervalavg$avg_steps))
+```
+
+The five-minute interval during the day that has the highest average steps is `r maxint[1,1]`.
 
 
+###Part 3: Imputing the Missing Values
 
-## What is the average daily activity pattern?
+Based on the recorded activity from the personal activity monitoring device, below is a histogram showing the frequencies of the total number of steps taken per day with the missing data imputed based on the average for the given time interval of missing data.  The most number of days have total steps between 10,000 and 15,000, which is the same as when missing values are removed from the data.
+
+```{r Imputing Missing Values}
+missing <- sum(is.na(activity))
+
+activityfull <- activity
+for(i in 1:nrow(activityfull)){
+    if(is.na(activityfull[i,1])){
+        activityfull[i,1] <- intervalavg[which(grepl(paste('^', activityfull[i,3], '$', sep = ""), intervalavg$interval)),2]
+    }
+}
+
+dailytotalfull <- ddply(activityfull, .(date), summarize, total_steps = sum(steps, na.rm = TRUE))
+hist(dailytotalfull$total_steps, main = "Total Number of Steps Taken with Imputed Values", xlab = "Total Steps Per Day")
+stepsmeanfull <- round(mean(dailytotalfull$total_steps, na.rm = T))
+stepsmedianfull <- round(median(dailytotalfull$total_steps, na.rm = T))
+```
+
+The number of missing values that were imputed is `r missing`. The mean for the total number of steps taken in a day with missing values imputed is `r stepsmeanfull` and the median for the total number of steps taken in a day is `r stepsmedianfull`.  The mean and median of the data with the imputed values is higher than when the missing values are removed.
 
 
+###Part 4: Weekday and Weekend Activity Patterns
+ 
+```{r Weekday and Weekend Activity Patterns}
+for (i in 1:nrow(activityfull)){
+   if(weekdays(activityfull[i,2]) == "Saturday"){
+       activityfull[i,4] <- "Weekend"
+   }
+   else{
+       activityfull[i,4] <- "Weekday"
+   }
+}
+colnames(activityfull) <- c("steps", "date", "interval", "weekpart")
+ 
+weekday <- subset(activityfull, activityfull$weekpart == "Weekday")
+weekend <- subset(activityfull, activityfull$weekpart == "Weekend")
+ 
+weekdayavg <- ddply(weekday, .(interval), summarize, avg_steps = mean(steps, na.rm = TRUE))
+weekendavg <- ddply(weekend, .(interval), summarize, avg_steps = mean(steps, na.rm = TRUE))
+ 
+par(mfrow = c(2, 1))
+ 
+plot(x = weekendavg$interval, y=weekendavg$avg_steps, type ="l", main = "Weekend Average Daily Activity Pattern", xlab = "Five Minute Intervals", ylab = "Average Steps", col = "dark green")
+plot(x = weekdayavg$interval, y=weekdayavg$avg_steps, type ="l", main = "Weekday Average Daily Activity Pattern", xlab = "Five Minute Intervals", ylab = "Average Steps", col = "dark blue")
+```
 
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+```{r Clean Up and Resetting the System}
+setwd(WD)
+rm(activity, WD, dailytotal, weekday, weekend, activityfull)
+```
